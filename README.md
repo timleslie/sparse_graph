@@ -1,0 +1,1 @@
+This package implements sparse graph algorithms. It is not fit for general consumption. Use at your own risk.

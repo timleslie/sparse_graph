@@ -1,10 +1,15 @@
 [package]
 name = "sparse_graph"
 version = "0.1.0"
-authors = ["Tim Leslie"]
+authors = ["Tim Leslie <tim.leslie@gmail.com>"]
 edition = "2018"
 description = "Sparse graph algorithms"
 licence = "MIT"
+repository = "https://github.com/timleslie/sparse_graph"
+homepage = "https://github.com/timleslie/sparse_graph"
+readme = "README.md"
+keywords = ["algorithms", "graph", "sparse"]
+categories = ["algorithms", "data-structures"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
