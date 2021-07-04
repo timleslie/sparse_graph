@@ -4,7 +4,6 @@ use std::fmt;
 
 #[derive(Debug)]
 pub struct SparseGraph {
-    pub size: usize,
     /// Starting index in indices for each vertex. These are strictly non-decreasing
     /// and less than `indices.len`.
     pub idxptr: Vec<usize>,
@@ -42,16 +41,11 @@ impl SparseGraph {
                 panic!("Bad index!");
             }
         }
-        return SparseGraph {
-            size: idxptr.len(),
-            idxptr,
-            indices,
-        };
+        return SparseGraph { idxptr, indices };
     }
 
     pub fn empty(N: usize) -> SparseGraph {
         return SparseGraph {
-            size: N,
             idxptr: vec![0; N],
             indices: vec![],
         };
@@ -60,7 +54,7 @@ impl SparseGraph {
     /// Compute the strongly connected components using a memory optimised version of Tarjan's algorithm.
     /// See http://citeseerx.ist.psu.edu/viewdoc/summary?doi=10.1.1.102.1707
     pub fn scc(&self) -> (usize, Vec<usize>) {
-        let N = self.size;
+        let N = self.idxptr.len();
         let END = N + 1;
         let VOID = N + 2;
 
