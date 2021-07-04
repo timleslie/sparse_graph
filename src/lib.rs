@@ -1,16 +1,19 @@
+#![allow(non_snake_case)]
+
 use std::fmt;
 
 #[derive(Debug)]
-pub struct SparseGraph<const N: usize> {
+pub struct SparseGraph {
+    pub size: usize,
     /// Starting index in indices for each vertex. These are strictly non-decreasing
     /// and less than `indices.len`.
-    pub idxptr: [usize; N],
+    pub idxptr: Vec<usize>,
     /// Values `0..N` indicating which nodes each vertex is linked to.
     /// Length is equal to the number edges in the graph.
     pub indices: Vec<usize>,
 }
 
-impl<const N: usize> fmt::Display for SparseGraph<N> {
+impl fmt::Display for SparseGraph {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "CSGraph: {{\n").expect("");
         for i in 0..self.indices.len() {
@@ -28,8 +31,8 @@ impl<const N: usize> fmt::Display for SparseGraph<N> {
     }
 }
 
-impl<const N: usize> SparseGraph<N> {
-    pub fn new(idxptr: [usize; N], indices: Vec<usize>) -> SparseGraph<N> {
+impl SparseGraph {
+    pub fn new(idxptr: Vec<usize>, indices: Vec<usize>) -> SparseGraph {
         let edge_count = indices.len();
         if idxptr[0] != 0 {
             panic!("Bad index ptr!");
@@ -39,20 +42,35 @@ impl<const N: usize> SparseGraph<N> {
                 panic!("Bad index!");
             }
         }
-        return SparseGraph { indices, idxptr };
+        return SparseGraph {
+            size: idxptr.len(),
+            idxptr,
+            indices,
+        };
     }
 
-    pub fn scc(&self) -> (usize, [usize; N]) {
-        let end = N + 1;
-        let void = N + 2;
+    pub fn empty(N: usize) -> SparseGraph {
+        return SparseGraph {
+            size: N,
+            idxptr: vec![0; N],
+            indices: vec![],
+        };
+    }
 
-        let mut lowlinks: [usize; N] = [void; N];
-        let mut stack_f: [usize; N] = [void; N];
-        let mut stack_b: [usize; N] = [void; N];
+    /// Compute the strongly connected components using a memory optimised version of Tarjan's algorithm.
+    /// See http://citeseerx.ist.psu.edu/viewdoc/summary?doi=10.1.1.102.1707
+    pub fn scc(&self) -> (usize, Vec<usize>) {
+        let N = self.size;
+        let END = N + 1;
+        let VOID = N + 2;
 
-        let mut label = N - 1;
+        let mut lowlinks = vec![VOID; N];
+        let mut stack_f = vec![VOID; N];
+        let mut stack_b = vec![VOID; N];
+
+        let mut label = N;
         let mut index = 0;
-        let mut ss_head = end;
+        let mut ss_head = END;
 
         println!("{:?}", self);
 
@@ -67,20 +85,20 @@ impl<const N: usize> SparseGraph<N> {
         for v1 in 0..N {
             println!("\nv1: {:?}", v1);
             // If not node hasn't been processed yet, it won't have a lowlink or a label
-            if lowlinks[v1] == void {
+            if lowlinks[v1] == VOID {
                 println!("DFS PUSH: {}", v1);
                 // DFS-stack push;
                 // At this point, the DFS stack is empty, so pushing sets both the
                 // forward and backwards pointers to end.
                 let mut stack_head = v1;
-                stack_f[v1] = end;
-                stack_b[v1] = end;
+                stack_f[v1] = END;
+                stack_b[v1] = END;
                 // We'll now proceed wih the inner loop algorithm until the stack is empty
-                while stack_head != end {
+                while stack_head != END {
                     let v = stack_head;
                     println!("  PROCESS STACK: {}", v);
                     println!("  lowlinks: {:?}", lowlinks);
-                    if lowlinks[v] == void {
+                    if lowlinks[v] == VOID {
                         println!("    TRAVERSE");
                         // If the top node in the stack hasn't been visited yet,
                         // assign it the next index value.
@@ -89,18 +107,24 @@ impl<const N: usize> SparseGraph<N> {
 
                         // Visit all of the nodes accessible from v and push then onto the stack
                         // ahead of v. If they're already in the stack, bring them to the top.
-                        let range_end = if v == N - 1 { N } else { self.idxptr[v + 1] };
+                        let range_end = if v == N - 1 {
+                            self.indices.len()
+                        } else {
+                            self.idxptr[v + 1]
+                        };
+
+                        println!("{}..{}", self.idxptr[v], range_end);
                         for j in self.idxptr[v]..range_end {
                             let w = self.indices[j];
-                            if lowlinks[w] == void {
-                                if stack_f[w] != void {
+                            if lowlinks[w] == VOID {
+                                if stack_f[w] != VOID {
                                     // w is already inside the stack, so excise it.
                                     let f = stack_f[w];
                                     let b = stack_b[w];
-                                    if b != end {
+                                    if b != END {
                                         stack_f[b] = f;
                                     }
-                                    if f != end {
+                                    if f != END {
                                         stack_b[f] = b;
                                     }
                                 }
@@ -108,7 +132,7 @@ impl<const N: usize> SparseGraph<N> {
                                 // Add w to the top of the stack. end <-> w <-> stack_head <-> ...
                                 println!("      DFS PUSH: {}", w);
                                 stack_f[w] = stack_head;
-                                stack_b[w] = end;
+                                stack_b[w] = END;
                                 stack_b[stack_head] = w;
                                 stack_head = w;
                             }
@@ -119,10 +143,10 @@ impl<const N: usize> SparseGraph<N> {
                         stack_head = stack_f[v];
                         // If the stack_head isn't the end
                         if stack_head < N {
-                            stack_b[stack_head] = end;
+                            stack_b[stack_head] = END;
                         }
-                        stack_f[v] = void;
-                        stack_b[v] = void;
+                        stack_f[v] = VOID;
+                        stack_b[v] = VOID;
 
                         // Find out whether this node is a root node
                         // We look at all its linked nodes (which have now all had this
@@ -132,7 +156,11 @@ impl<const N: usize> SparseGraph<N> {
                         let mut root = true;
                         let mut low_v = lowlinks[v];
                         println!("      low_v {}", low_v);
-                        let range_end = if v == N - 1 { N } else { self.idxptr[v + 1] };
+                        let range_end = if v == N - 1 {
+                            self.indices.len()
+                        } else {
+                            self.idxptr[v + 1]
+                        };
                         for j in self.idxptr[v]..range_end {
                             let low_w = lowlinks[self.indices[j]];
                             println!("      low_w {}", low_w);
@@ -152,10 +180,10 @@ impl<const N: usize> SparseGraph<N> {
                             // We can reclaim their index values at this point.
 
                             // while S not empty and rindex[v] <= rindex[top[S]]
-                            while ss_head != end && lowlinks[v] <= lowlinks[ss_head] {
+                            while ss_head != END && lowlinks[v] <= lowlinks[ss_head] {
                                 let w = ss_head; // w = pop(S)
                                 ss_head = ss[w];
-                                ss[w] = void;
+                                ss[w] = VOID;
                                 let labels = &mut lowlinks;
                                 labels[w] = label; // rindex[w] = c;
                                 index -= 1; // index = index - 1
@@ -168,9 +196,7 @@ impl<const N: usize> SparseGraph<N> {
 
                             // Move to the next available label value
                             println!("      DEC LABEL {}", label);
-                            if label > 0 {
-                                label -= 1;
-                            }
+                            label -= 1;
                         } else {
                             // We haven't got to the root of this group, so add v to the sets stack
                             ss[v] = ss_head; // push(S, v)
@@ -185,10 +211,11 @@ impl<const N: usize> SparseGraph<N> {
         println!("END LABELS, {:?}", labels);
 
         for label in labels.iter_mut() {
-            *label = (N - 1) - *label
+            *label = N - *label
         }
         println!("FINAL LABELS, {:?}", labels);
-        return ((N - 1) - label, lowlinks);
+        println!("FINAL LABEL, {}", label);
+        return (N - label, lowlinks);
     }
 }
 
@@ -198,16 +225,33 @@ mod tests {
 
     #[test]
     fn sparse_graph_new() {
-        let g = SparseGraph::new([0, 1, 2], vec![1, 2, 0]);
+        let g = SparseGraph::new(vec![0, 1, 2], vec![1, 2, 0]);
         assert_eq!(g.idxptr, [0, 1, 2]);
         assert_eq!(g.indices, [1, 2, 0]);
     }
 
     #[test]
-    fn scc() {
-        let g = SparseGraph::new([0, 1, 2], vec![1, 2, 0]);
+    fn scc_1() {
+        let g = SparseGraph::new(vec![0, 1, 2], vec![1, 2, 0]);
         let (n, labels) = g.scc();
         assert_eq!(n, 1);
         assert_eq!(labels, [0, 0, 0]);
+    }
+
+    #[test]
+    fn scc_2() {
+        let g = SparseGraph::empty(3);
+        dbg!(&g);
+        let (n, labels) = g.scc();
+        assert_eq!(n, 3);
+        assert_eq!(labels, [0, 1, 2]);
+    }
+
+    #[test]
+    fn scc_3() {
+        let g = SparseGraph::new(vec![0, 1, 3, 4, 5, 6], vec![1, 2, 3, 0, 4, 5, 3]);
+        let (n, labels) = g.scc();
+        assert_eq!(n, 2);
+        assert_eq!(labels, [1, 1, 1, 0, 0, 0]);
     }
 }
