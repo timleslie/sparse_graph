@@ -6,8 +6,8 @@ use std::fmt;
 /// [compressed sparse row](https://en.wikipedia.org/wiki/Sparse_matrix#Compressed_sparse_row_(CSR,_CRS_or_Yale_format)) format.
 #[derive(Debug)]
 pub struct SparseGraph<'a> {
-    idxptr: &'a Vec<usize>,  // O(V)
-    indices: &'a Vec<usize>, // O(E)
+    idxptr: &'a [usize],  // O(V)
+    indices: &'a [usize], // O(E)
 }
 
 impl SparseGraph<'_> {
@@ -30,9 +30,9 @@ impl SparseGraph<'_> {
     /// let (idxptr, indices) = (vec![0, 1, 3, 4, 5, 6], vec![1, 2, 3, 0, 4, 5, 3]);
     /// let g = SparseGraph::new(&idxptr, &indices);
     /// ```
-    pub fn new<'a>(idxptr: &'a Vec<usize>, indices: &'a Vec<usize>) -> SparseGraph<'a> {
+    pub fn new<'a>(idxptr: &'a [usize], indices: &'a [usize]) -> SparseGraph<'a> {
         let edge_count = indices.len();
-        if idxptr.len() > 0 && idxptr[0] != 0 {
+        if idxptr.is_empty() && idxptr[0] != 0 {
             panic!("Bad index ptr!");
         }
         if edge_count > 0 {
