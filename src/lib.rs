@@ -2,58 +2,69 @@
 
 use std::fmt;
 
+/// A `SparseGraph` represents an unweighted graph with `V` nodes and `E` edges using the
+/// [compressed sparse row](https://en.wikipedia.org/wiki/Sparse_matrix#Compressed_sparse_row_(CSR,_CRS_or_Yale_format)) format.
 #[derive(Debug)]
-pub struct SparseGraph {
-    /// Starting index in `indices` for each vertex. These are strictly non-decreasing
-    /// and less than `indices.len`. Length is equal to the number of nodes in the graph.
-    pub idxptr: Vec<usize>,
-    /// Values `0..N-1` indicating which nodes each vertex is linked to.
-    /// Length is equal to the number edges in the graph.
-    pub indices: Vec<usize>,
+pub struct SparseGraph<'a> {
+    idxptr: &'a [usize],  // O(V)
+    indices: &'a [usize], // O(E)
 }
 
-impl fmt::Display for SparseGraph {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        writeln!(f, "CSGraph: {{").expect("");
-        for i in 0..self.indices.len() {
-            let start = self.indices[i];
-            let end;
-            if i == self.indices.len() - 1 {
-                end = self.idxptr.len()
-            } else {
-                end = self.indices[i + 1];
-            }
-            let node = &self.idxptr[start..end];
-            writeln!(f, "  Node {}: {:?}", i, node).expect("");
-        }
-        write!(f, "}}")
-    }
-}
-
-impl SparseGraph {
-    pub fn new(idxptr: Vec<usize>, indices: Vec<usize>) -> SparseGraph {
+impl SparseGraph<'_> {
+    /// Returns a sparse graph.
+    ///
+    /// # Arguments
+    ///
+    /// * `idxptr` - Starting index in `indices` for each vertex. These must be strictly non-decreasing
+    /// and less than `indices.len`. The length defines the number of nodes in the graph, `V`
+    /// * `indices` - Values in the range `0..V-1` indicating which nodes each vertex is linked to.
+    /// The length defines the number edges in the graph, `E`.
+    ///
+    /// # Panics
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use sparse_graph::SparseGraph;
+    ///
+    /// let (idxptr, indices) = (vec![0, 1, 3, 4, 5, 6], vec![1, 2, 3, 0, 4, 5, 3]);
+    /// let g = SparseGraph::new(&idxptr, &indices);
+    /// ```
+    pub fn new<'a>(idxptr: &'a [usize], indices: &'a [usize]) -> SparseGraph<'a> {
         let edge_count = indices.len();
-        if idxptr[0] != 0 {
+        if idxptr.is_empty() && idxptr[0] != 0 {
             panic!("Bad index ptr!");
         }
-        for index in idxptr.iter() {
-            if *index >= edge_count {
-                panic!("Bad index!");
+        if edge_count > 0 {
+            for index in idxptr.iter() {
+                if *index >= edge_count {
+                    panic!("Bad index!");
+                }
             }
         }
         SparseGraph { idxptr, indices }
     }
 
-    pub fn empty(N: usize) -> SparseGraph {
-        SparseGraph {
-            idxptr: vec![0; N],
-            indices: vec![],
-        }
-    }
-
-    /// Compute the strongly connected components using a memory optimised version of Tarjan's algorithm.
-    /// See http://citeseerx.ist.psu.edu/viewdoc/summary?doi=10.1.1.102.1707
-    pub fn scc(&self) -> (usize, Vec<usize>) {
+    /// Computes the strongly connected components using a memory optimised version of Tarjan's algorithm.
+    ///
+    /// See <http://citeseerx.ist.psu.edu/viewdoc/summary?doi=10.1.1.102.1707>.
+    ///
+    /// Returns
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use sparse_graph::{SparseGraph, ConnectedComponents};
+    ///
+    /// // Create a graph with two strongly connect components
+    /// let (idxptr, indices) = (vec![0, 1, 3, 4, 5, 6], vec![1, 2, 3, 0, 4, 5, 3]);
+    /// let g = SparseGraph::new(&idxptr, &indices);
+    /// let ConnectedComponents { n, labels, sparse_graph } = g.scc();
+    /// assert_eq!(n, 2);
+    /// assert_eq!(labels, [1, 1, 1, 0, 0, 0]);
+    /// assert!(std::ptr::eq(sparse_graph, &g))
+    /// ```
+    pub fn scc(&self) -> ConnectedComponents {
         let N = self.idxptr.len();
         let END = N + 1;
         let VOID = N + 2;
@@ -66,21 +77,10 @@ impl SparseGraph {
         let mut index = 0;
         let mut ss_head = END;
 
-        println!("{:?}", self);
-
-        println!("lowlinks: {:?}", lowlinks);
-        println!("stack_f: {:?}", stack_f);
-        println!("stack_b: {:?}", stack_b);
-
-        println!("label: {}", label);
-        println!("index: {}", index);
-        println!("ss_head: {}", ss_head);
         // Iterate over every node in order
         for v1 in 0..N {
-            println!("\nv1: {:?}", v1);
             // If not node hasn't been processed yet, it won't have a lowlink or a label
             if lowlinks[v1] == VOID {
-                println!("DFS PUSH: {}", v1);
                 // DFS-stack push;
                 // At this point, the DFS stack is empty, so pushing sets both the
                 // forward and backwards pointers to end.
@@ -90,10 +90,7 @@ impl SparseGraph {
                 // We'll now proceed wih the inner loop algorithm until the stack is empty
                 while stack_head != END {
                     let v = stack_head;
-                    println!("  PROCESS STACK: {}", v);
-                    println!("  lowlinks: {:?}", lowlinks);
                     if lowlinks[v] == VOID {
-                        println!("    TRAVERSE");
                         // If the top node in the stack hasn't been visited yet,
                         // assign it the next index value.
                         lowlinks[v] = index;
@@ -107,7 +104,6 @@ impl SparseGraph {
                             self.idxptr[v + 1]
                         };
 
-                        println!("{}..{}", self.idxptr[v], range_end);
                         for &w in &self.indices[self.idxptr[v]..range_end] {
                             if lowlinks[w] == VOID {
                                 if stack_f[w] != VOID {
@@ -123,7 +119,6 @@ impl SparseGraph {
                                 }
 
                                 // Add w to the top of the stack. end <-> w <-> stack_head <-> ...
-                                println!("      DFS PUSH: {}", w);
                                 stack_f[w] = stack_head;
                                 stack_b[w] = END;
                                 stack_b[stack_head] = w;
@@ -131,7 +126,6 @@ impl SparseGraph {
                             }
                         }
                     } else {
-                        println!("    POP");
                         // DFS-stack pop
                         stack_head = stack_f[v];
                         // If the stack_head isn't the end
@@ -148,7 +142,6 @@ impl SparseGraph {
                         // index.
                         let mut root = true;
                         let mut low_v = lowlinks[v];
-                        println!("      low_v {}", low_v);
                         let range_end = if v == N - 1 {
                             self.indices.len()
                         } else {
@@ -156,7 +149,6 @@ impl SparseGraph {
                         };
                         for &w in &self.indices[self.idxptr[v]..range_end] {
                             let low_w = lowlinks[w];
-                            println!("      low_w {}", low_w);
                             if low_w < low_v {
                                 low_v = low_w;
                                 root = false;
@@ -165,7 +157,6 @@ impl SparseGraph {
                         lowlinks[v] = low_v;
                         let ss = &mut stack_f;
                         if root {
-                            println!("      ROOT");
                             // Found a root node. This means we've found the root of
                             // a strongly connected component. All the items on the stack
                             // with an index greater or equal to the current nodes index
@@ -188,7 +179,6 @@ impl SparseGraph {
                             labels[v] = label; // rindex[v] = c
 
                             // Move to the next available label value
-                            println!("      DEC LABEL {}", label);
                             label -= 1;
                         } else {
                             // We haven't got to the root of this group, so add v to the sets stack
@@ -201,15 +191,94 @@ impl SparseGraph {
         }
         let labels = &mut lowlinks;
 
-        println!("END LABELS, {:?}", labels);
-
         for label in labels.iter_mut() {
             *label = N - *label
         }
-        println!("FINAL LABELS, {:?}", labels);
-        println!("FINAL LABEL, {}", label);
-        (N - label, lowlinks)
+        ConnectedComponents {
+            n: N - label,
+            labels: lowlinks,
+            sparse_graph: self,
+        }
     }
+}
+
+/// A label map of the connected components of a graph.
+pub struct ConnectedComponents<'a> {
+    /// The sparse graph associated with the connected components.
+    pub sparse_graph: &'a SparseGraph<'a>,
+    /// The number of connected components.
+    pub n: usize,
+    /// A vector of labels from `0` to `n-1`. Corresponding nodes with the same label beloing to the same connected component.
+    pub labels: Vec<usize>,
+}
+
+impl fmt::Display for SparseGraph<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        writeln!(f, "SparseGraph: {{").expect("");
+        for i in 0..self.indices.len() {
+            let start = self.indices[i];
+            let end;
+            if i == self.indices.len() - 1 {
+                end = self.idxptr.len()
+            } else {
+                end = self.indices[i + 1];
+            }
+            let node = &self.idxptr[start..end];
+            writeln!(f, "  Node {}: {:?}", i, node).expect("");
+        }
+        write!(f, "}}")
+    }
+}
+
+#[derive(Debug)]
+pub struct WeightedSparseGraph<'a, W> {
+    /// Starting index in `indices` for each vertex. These are strictly non-decreasing
+    /// and less than `indices.len`. Length is equal to the number of nodes in the graph, `V`.
+    idxptr: &'a Vec<usize>,
+    /// Values in the range `0..V-1` indicating which nodes each vertex is linked to.
+    /// Length is equal to the number edges in the graph, `E`.
+    indices: &'a Vec<usize>,
+
+    // Edge weights. The weights correspond to the edges defined in `indices`.
+    weights: &'a Vec<W>,
+}
+
+#[derive(Debug)]
+pub struct ValuedSparseGraph<'a, V> {
+    /// Starting index in `indices` for each vertex. These are strictly non-decreasing
+    /// and less than `indices.len`. Length is equal to the number of nodes in the graph.
+    idxptr: &'a Vec<usize>,
+    /// Values `0..N-1` indicating which nodes each vertex is linked to.
+    /// Length is equal to the number edges in the graph.
+    indices: &'a Vec<usize>,
+
+    // Vertex values. The values correspond to the values in `idxptr`.
+    values: Vec<V>,
+}
+
+impl<'a, V> ValuedSparseGraph<'a, V> {
+    pub fn as_sparse_graph(&self) -> SparseGraph {
+        SparseGraph {
+            indices: &self.indices,
+            idxptr: &self.idxptr,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct WeightedValuedSparseGraph<'a, W, V> {
+    /// Starting index in `indices` for each vertex. These are strictly non-decreasing
+    /// and less than `indices.len`. Length is equal to the number of nodes in the graph.
+    idxptr: &'a Vec<usize>,
+    /// Values `0..N-1` indicating which nodes each vertex is linked to.
+    /// Length is equal to the number edges in the graph.
+    indices: &'a Vec<usize>,
+
+    // Vertex values. The values correspond to the values in `idxptr`.
+    values: &'a Vec<V>,
+
+    // Edge weights. The weights correspond to the edges defined in `indices`.
+    weights: &'a Vec<W>,
 }
 
 #[cfg(test)]
@@ -218,32 +287,37 @@ mod tests {
 
     #[test]
     fn sparse_graph_new() {
-        let g = SparseGraph::new(vec![0, 1, 2], vec![1, 2, 0]);
-        assert_eq!(g.idxptr, [0, 1, 2]);
-        assert_eq!(g.indices, [1, 2, 0]);
+        let (a, b) = (vec![0, 1, 2], vec![1, 2, 0]);
+        let g = SparseGraph::new(&a, &b);
+        assert_eq!(*(g.idxptr), [0, 1, 2]);
+        assert_eq!(*g.indices, [1, 2, 0]);
     }
 
     #[test]
     fn scc_1() {
-        let g = SparseGraph::new(vec![0, 1, 2], vec![1, 2, 0]);
-        let (n, labels) = g.scc();
+        let (a, b) = (vec![0, 1, 2], vec![1, 2, 0]);
+        let g = SparseGraph::new(&a, &b);
+        let ConnectedComponents { n, labels, sparse_graph } = g.scc();
         assert_eq!(n, 1);
         assert_eq!(labels, [0, 0, 0]);
+        assert!(std::ptr::eq(sparse_graph, &g))
     }
 
     #[test]
     fn scc_2() {
-        let g = SparseGraph::empty(3);
+        let (a, b) = (vec![0; 3], vec![]);
+        let g = SparseGraph::new(&a, &b);
         dbg!(&g);
-        let (n, labels) = g.scc();
+        let ConnectedComponents { n, labels, .. } = g.scc();
         assert_eq!(n, 3);
         assert_eq!(labels, [0, 1, 2]);
     }
 
     #[test]
     fn scc_3() {
-        let g = SparseGraph::new(vec![0, 1, 3, 4, 5, 6], vec![1, 2, 3, 0, 4, 5, 3]);
-        let (n, labels) = g.scc();
+        let (a, b) = (vec![0, 1, 3, 4, 5, 6], vec![1, 2, 3, 0, 4, 5, 3]);
+        let g = SparseGraph::new(&a, &b);
+        let ConnectedComponents { n, labels, .. } = g.scc();
         assert_eq!(n, 2);
         assert_eq!(labels, [1, 1, 1, 0, 0, 0]);
     }
