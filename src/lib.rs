@@ -14,7 +14,7 @@ pub struct SparseGraph {
 
 impl fmt::Display for SparseGraph {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "CSGraph: {{\n").expect("");
+        writeln!(f, "CSGraph: {{").expect("");
         for i in 0..self.indices.len() {
             let start = self.indices[i];
             let end;
@@ -23,10 +23,10 @@ impl fmt::Display for SparseGraph {
             } else {
                 end = self.indices[i + 1];
             }
-            let foo = &self.idxptr[start..end];
-            write!(f, "  Node {}: {:?}\n", i, foo).expect("");
+            let node = &self.idxptr[start..end];
+            writeln!(f, "  Node {}: {:?}", i, node).expect("");
         }
-        return write!(f, "}}");
+        write!(f, "}}")
     }
 }
 
@@ -41,14 +41,14 @@ impl SparseGraph {
                 panic!("Bad index!");
             }
         }
-        return SparseGraph { idxptr, indices };
+        SparseGraph { idxptr, indices }
     }
 
     pub fn empty(N: usize) -> SparseGraph {
-        return SparseGraph {
+        SparseGraph {
             idxptr: vec![0; N],
             indices: vec![],
-        };
+        }
     }
 
     /// Compute the strongly connected components using a memory optimised version of Tarjan's algorithm.
@@ -208,7 +208,7 @@ impl SparseGraph {
         }
         println!("FINAL LABELS, {:?}", labels);
         println!("FINAL LABEL, {}", label);
-        return (N - label, lowlinks);
+        (N - label, lowlinks)
     }
 }
 
