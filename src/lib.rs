@@ -4,10 +4,10 @@ use std::fmt;
 
 #[derive(Debug)]
 pub struct SparseGraph {
-    /// Starting index in indices for each vertex. These are strictly non-decreasing
-    /// and less than `indices.len`.
+    /// Starting index in `indices` for each vertex. These are strictly non-decreasing
+    /// and less than `indices.len`. Length is equal to the number of nodes in the graph.
     pub idxptr: Vec<usize>,
-    /// Values `0..N` indicating which nodes each vertex is linked to.
+    /// Values `0..N-1` indicating which nodes each vertex is linked to.
     /// Length is equal to the number edges in the graph.
     pub indices: Vec<usize>,
 }
@@ -108,8 +108,7 @@ impl SparseGraph {
                         };
 
                         println!("{}..{}", self.idxptr[v], range_end);
-                        for j in self.idxptr[v]..range_end {
-                            let w = self.indices[j];
+                        for &w in &self.indices[self.idxptr[v]..range_end] {
                             if lowlinks[w] == VOID {
                                 if stack_f[w] != VOID {
                                     // w is already inside the stack, so excise it.
@@ -155,8 +154,8 @@ impl SparseGraph {
                         } else {
                             self.idxptr[v + 1]
                         };
-                        for j in self.idxptr[v]..range_end {
-                            let low_w = lowlinks[self.indices[j]];
+                        for &w in &self.indices[self.idxptr[v]..range_end] {
+                            let low_w = lowlinks[w];
                             println!("      low_w {}", low_w);
                             if low_w < low_v {
                                 low_v = low_w;
