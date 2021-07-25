@@ -1,6 +1,6 @@
 [package]
 name = "sparse_graph"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["Tim Leslie <tim.leslie@gmail.com>"]
 edition = "2018"
 description = "Sparse graph algorithms"
