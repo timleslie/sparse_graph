@@ -297,7 +297,11 @@ mod tests {
     fn scc_1() {
         let (a, b) = (vec![0, 1, 2], vec![1, 2, 0]);
         let g = SparseGraph::new(&a, &b);
-        let ConnectedComponents { n, labels, sparse_graph } = g.scc();
+        let ConnectedComponents {
+            n,
+            labels,
+            sparse_graph,
+        } = g.scc();
         assert_eq!(n, 1);
         assert_eq!(labels, [0, 0, 0]);
         assert!(std::ptr::eq(sparse_graph, &g))
